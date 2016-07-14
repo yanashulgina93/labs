@@ -10,7 +10,6 @@ void testMyFilter(const cv::Mat & src)
 
     myFilter(src, filtered, threshold1, threshold2, ksize);
 
-
     cv::imshow("src", src);
     cv::imshow("filtered", filtered);
     cv::waitKey(0);
