@@ -15,7 +15,6 @@ void testMyFilter(const cv::Mat & src)
     cv::waitKey(0);
 }
 
-
 int main()
 {
     cv::Mat src = cv::imread("../door.png", 1);
