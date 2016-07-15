@@ -5,112 +5,109 @@
 #include <iostream>
 #include "highgui.h"
 
-void myCanny(const cv::Mat & grayscale, cv::Mat edges, int threshold1, int threshold2)
+void myCanny(const cv::Mat & grayscale, cv::Mat & edges, int threshold1, int threshold2)
 {
-    cv::Mat gradX, gradY;
-    cv::Mat gradMagn(grayscale.rows, grayscale.cols, CV_32FC1, 0.0);
-    cv::Mat gradAngle(grayscale.rows, grayscale.cols, CV_32FC1, 0.0);
+    edges=cv::Scalar(0);
 
+    cv::Mat gradX, gradY;
     cv::Sobel(grayscale, gradX, CV_32FC1, 1, 0);
     cv::Sobel(grayscale, gradY, CV_32FC1, 0, 1);
 
-    float PI = atan(1)*4;
-
-    for(int i = 0; i < gradX.rows; i++)
-    {
-        for(int j = 0; j < gradX.cols; j++)
-        {
-            gradMagn.at<float>(i,j) = sqrt((gradX.at<float>(i,j)*gradX.at<float>(i,j)) + (gradY.at<float>(i,j)*gradY.at<float>(i,j)));
-            if (gradX.at<float>(i,j) != 0.0)
-            {
-                gradAngle.at<float>(i,j) = atan2(gradY.at<float>(i,j), gradX.at<float>(i,j)) * 180 / PI;
-                if (gradAngle.at<float>(i,j) >= 0)
-                {
-                    if ((gradAngle.at<float>(i,j) < 22) || (gradAngle.at<float>(i,j) >= 157))
-                        gradAngle.at<float>(i,j) = 0.0;
-                    if ((gradAngle.at<float>(i,j) >= 22)&& (gradAngle.at<float>(i,j) < 67))
-                        gradAngle.at<float>(i,j) = 45.0;
-                    if((gradAngle.at<float>(i,j) >= 67) && (gradAngle.at<float>(i,j) < 112))
-                        gradAngle.at<float>(i,j) = 90.0;
-                    if ((gradAngle.at<float>(i,j) >= 112) && (gradAngle.at<float>(i,j) < 157))
-                        gradAngle.at<float>(i,j) = 135;
-                }
-                else
-                {
-                    if ((gradAngle.at<float>(i,j) > -22) || (gradAngle.at<float>(i,j) <= -157))
-                        gradAngle.at<float>(i,j) = 0.0;
-                    if ((gradAngle.at<float>(i,j) <= -22)&& (gradAngle.at<float>(i,j) > -67))
-                        gradAngle.at<float>(i,j) = 135.0;
-                    if((gradAngle.at<float>(i,j) <= -67) && (gradAngle.at<float>(i,j) > -112))
-                        gradAngle.at<float>(i,j) = 90.0;
-                    if ((gradAngle.at<float>(i,j) <= -112) && (gradAngle.at<float>(i,j) > -157))
-                        gradAngle.at<float>(i,j) = 45;
-                }
-
-            }
-            else
-                gradAngle.at<float>(i,j) = 90.0;
-        }
-    }
-
-    for(int i = 0; i < gradMagn.rows; i++)
-    {
-        for(int j = 0; j < gradMagn.cols; j++)
-        {
-            if (gradMagn.at<float>(i,j) <= threshold1)
-                edges.at<uchar>(i,j) = 0;
-            else
-                edges.at<uchar>(i,j) = grayscale.at<uchar>(i,j);
-        }
-    }
+    cv::Mat gradMagn(grayscale.rows, grayscale.cols, CV_32FC1, 0.0);
+    cv::Mat gradAngle(grayscale.rows, grayscale.cols, CV_32FC1, 0.0);
+    cv::cartToPolar(gradX, gradY, gradMagn, gradAngle, true);
 
     std::stack<cv::Point> edgePixels;
     for(int i = 1; i < gradMagn.rows-1; i++)
     {
+        float* gradMagn_prev_row_ptr = gradMagn.ptr<float>(i-1);
+        float* gradMagn_cur_row_ptr = gradMagn.ptr<float>(i);
+        float* gradMagn_next_row_ptr = gradMagn.ptr<float>(i+1);
+        float* gradAngle_cur_ptr = gradAngle.ptr<float>(i);
+        uchar* edges_row_ptr = edges.ptr<uchar>(i);
         for(int j = 1; j < gradMagn.cols-1; j++)
         {
-            if (gradMagn.at<float> (i,j) >= threshold2)
+            //std::cout<<gradMagn.at<float> (i,j)<<" "<<(gradMagn_row_ptr[j])<<std::endl;
+            if (gradMagn_cur_row_ptr[j] >= threshold2)
             {
-                if (gradAngle.at<float>(i,j) == 0)
+                if (gradAngle_cur_ptr[j] >= 0)
                 {
-                    if((gradMagn.at<float>(i,j) > gradMagn.at<float>(i,j-1))&&(gradMagn.at<float>(i,j) > gradMagn.at<float>(i,j+1)))
+                    if ((gradAngle_cur_ptr[j] < 22) || (gradAngle_cur_ptr[j] >= 157))//0
                     {
-                        edges.at<uchar>(i,j) = 255;
-                        edgePixels.push(cv::Point(j,i));
+                        if((gradMagn_cur_row_ptr[j] > gradMagn_prev_row_ptr[j])&&(gradMagn_cur_row_ptr[j] > gradMagn_next_row_ptr[j]))
+                        {
+                            edges_row_ptr[j] = 255;
+                            edgePixels.push(cv::Point(j,i));
+                        }
+                    }
+                    else if ((gradAngle_cur_ptr[j] >= 22)&& (gradAngle_cur_ptr[j] < 67))//45
+                    {
+                        if ((gradMagn_cur_row_ptr[j] > gradMagn_prev_row_ptr[j-1]) && (gradMagn_cur_row_ptr[j] > gradMagn_next_row_ptr[j+1]))
+                        {
+                            edges_row_ptr[j] = 255;
+                            edgePixels.push(cv::Point(j,i));
+                        }
+                    }
+                    else if ((gradAngle_cur_ptr[j] >= 67) && (gradAngle_cur_ptr[j] < 112))//90
+                    {
+                        if((gradMagn_cur_row_ptr[j] > gradMagn_cur_row_ptr[j-1])&& (gradMagn_cur_row_ptr[j] > gradMagn_cur_row_ptr[j+1]))
+                        {
+                            edges_row_ptr[j] = 255;
+                            edgePixels.push(cv::Point(j,i));
+                        }
+                    }
+                    else if ((gradAngle_cur_ptr[j] >= 112) && (gradAngle_cur_ptr[j] < 157))//135
+                    {
+                        if ((gradMagn_cur_row_ptr[j] > gradMagn_next_row_ptr[j-1]) && (gradMagn_cur_row_ptr[j] > gradMagn_prev_row_ptr[j+1]))
+                        {
+                            edges_row_ptr[j] = 255;
+                            edgePixels.push(cv::Point(j,i));
+                        }
                     }
                 }
-                if (gradAngle.at<float>(i,j) == 45)
+                else
                 {
-                    if ((gradMagn.at<float>(i,j) > gradMagn.at<float>(i+1,j-1)) && (gradMagn.at<float>(i,j) > gradMagn.at<float>(i-1,j+1)))
+                    if ((gradAngle_cur_ptr[j] > -22) || (gradAngle_cur_ptr[j] <= -157))//0
                     {
-                        edges.at<uchar>(i,j) = 255;
-                        edgePixels.push(cv::Point(j,i));
+                        if((gradMagn_cur_row_ptr[j] > gradMagn_prev_row_ptr[j])&&(gradMagn_cur_row_ptr[j] > gradMagn_next_row_ptr[j]))
+                        {
+                            edges_row_ptr[j] = 255;
+                            edgePixels.push(cv::Point(j,i));
+                        }
                     }
-                }
-                if (gradAngle.at<float>(i,j) == 90)
-                {
-                    if((gradMagn.at<float>(i,j) > gradMagn.at<float>(i-1,j))&& (gradMagn.at<float>(i,j) > gradMagn.at<float>(i+1,j)))
+                    if ((gradAngle_cur_ptr[j] <= -112) && (gradAngle_cur_ptr[j] > -157))//45 (-135)
                     {
-                        edges.at<uchar>(i,j) = 255;
-                        edgePixels.push(cv::Point(j,i));
+                        if ((gradMagn_cur_row_ptr[j] > gradMagn_next_row_ptr[j+1]) && (gradMagn_cur_row_ptr[j] > gradMagn_prev_row_ptr[j-1]))
+                        {
+                            edges_row_ptr[j] = 255;
+                            edgePixels.push(cv::Point(j,i));
+                        }
                     }
-                }
-                if (gradAngle.at<float>(i,j) == 135)
-                {
-                    if ((gradMagn.at<float>(i,j) > gradMagn.at<float>(i-1,j-1)) && (gradMagn.at<float>(i,j) > gradMagn.at<float>(i+1,j+1)))
+                    if ((gradAngle_cur_ptr[j] <= -67) && (gradAngle_cur_ptr[j] > -112))//90
                     {
-                        edges.at<uchar>(i,j) = 255;
-                        edgePixels.push(cv::Point(j,i));
+                        if((gradMagn_cur_row_ptr[j] > gradMagn_cur_row_ptr[j-1])&& (gradMagn_cur_row_ptr[j] > gradMagn_cur_row_ptr[j+1]))
+                        {
+                            edges_row_ptr[j] = 255;
+                            edgePixels.push(cv::Point(j,i));
+                        }
                     }
-                }
-            }
+                    if ((gradAngle_cur_ptr[j] <= -22)&& (gradAngle_cur_ptr[j] > -67))//135
+                    {
+                        if ((gradMagn_cur_row_ptr[j] > gradMagn_next_row_ptr[j-1]) && (gradMagn_cur_row_ptr[j] > gradMagn_prev_row_ptr[j+1]))
+                        {
+                            edges_row_ptr[j] = 255;
+                            edgePixels.push(cv::Point(j,i));
+                        }
+                    }
 
-            else if (edges.at<uchar>(i,j) != 0)
-            {
-                edges.at<uchar>(i,j) = 100;
+                }
+
+
             }
         }
     }
+    cv::imshow("test1", edges);
+    cv::waitKey();
 
     int radius = 1;
     while(!edgePixels.empty())
@@ -119,73 +116,64 @@ void myCanny(const cv::Mat & grayscale, cv::Mat edges, int threshold1, int thres
         edgePixels.pop();
         for(int i = std::max(p.y-radius, 0); i <= std::min(p.y+radius, edges.rows-1); i++)
         {
+            float* gradMagn_row_ptr = gradMagn.ptr<float>(i);
+            uchar* edges_row_ptr = edges.ptr<uchar>(i);
             for(int j = std::max(p.x-radius, 0); j <= std::min(p.x + radius, edges.cols-1); j++)
             {
-                if((gradMagn.at<float>(i,j) > threshold1)&&((gradMagn.at<float>(i,j) < threshold2))
-                        && (edges.at<uchar>(i,j) == 100))
+                if((gradMagn_row_ptr[j] > threshold1)&&(gradMagn_row_ptr[j] < threshold2)&&(edges_row_ptr[j] != 255))
                 {
-                    edges.at<uchar>(i,j) = 255;
+                    edges_row_ptr[j] = 255;
                     edgePixels.push(cv::Point(j,i));
                 }
             }
         }
     }
-
-    for(int i = 0; i < edges.rows; i++)
-    {
-        for(int j = 0; j < edges.cols; j++)
-        {
-            if ((edges.at<uchar>(i,j) > 0)&&(edges.at<uchar>(i,j) < 255))
-            {
-                edges.at<uchar>(i,j) = 0;
-            }
-
-        }
-    }
+    cv::imshow("test2", edges);
+    cv::waitKey();
 }
 
-void getDistanceMap(const cv::Mat & edges, cv::Mat & Dist)
+void getDistanceMap(const cv::Mat & edges, cv::Mat & dist)
 {
-    for(int r = 0; r < Dist.rows; r++)
+    for(int r = 0; r < dist.rows; r++)
     {
-        for(int c = 0; c < Dist.cols; c++)
+        for(int c = 0; c < dist.cols; c++)
         {
             if (edges.at<uchar>(r,c) > 0)
-                Dist.at<int>(r,c) = 0;
+                dist.at<int>(r,c) = 0;
             else
-                Dist.at<int>(r,c) = -1;
+                dist.at<int>(r,c) = -1;
         }
     }
 
     bool findBorder;
     int radius;
-    for(int r = 0; r < Dist.rows; r++)
+    for(int r = 0; r < dist.rows; r++)
     {
-        for(int c = 0; c < Dist.cols; c++)
+        for(int c = 0; c < dist.cols; c++)
         {
-            if(Dist.at<int>(r,c) == -1)
+            if(dist.at<int>(r,c) == -1)
             {
                 findBorder = false;
                 radius = 1;
                 while(!findBorder)
                 {
-                    for(int c1 = std::max(c-radius,0); c1 <= std::min(Dist.cols-1, c+radius); c1++)
+                    for(int c1 = std::max(c-radius,0); c1 <= std::min(dist.cols-1, c+radius); c1++)
                     {
-                        if((Dist.at<int>(std::max(r-radius, 0), c1)==0) || (Dist.at<int>(std::min(r+radius, Dist.rows-1), c1)==0))
+                        if((dist.at<int>(std::max(r-radius, 0), c1)==0) || (dist.at<int>(std::min(r+radius, dist.rows-1), c1)==0))
                         {
                             findBorder = true;
-                            Dist.at<int>(r,c) = radius;
+                            dist.at<int>(r,c) = radius;
                             break;
                         }
                     }
                     if(!findBorder)
                     {
-                        for(int r1 = std::max(r-radius,0); r1 <= std::min(Dist.rows-1, r+radius); r1++)
+                        for(int r1 = std::max(r-radius,0); r1 <= std::min(dist.rows-1, r+radius); r1++)
                         {
-                            if((Dist.at<int>(r1, std::max(c-radius, 0))==0) || (Dist.at<int>(r1, std::min(c+radius, Dist.cols-1))==0))
+                            if((dist.at<int>(r1, std::max(c-radius, 0))==0) || (dist.at<int>(r1, std::min(c+radius, dist.cols-1))==0))
                             {
                                 findBorder = true;
-                                Dist.at<int>(r,c) = radius;
+                                dist.at<int>(r,c) = radius;
                                 break;
                             }
                         }
