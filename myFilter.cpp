@@ -102,13 +102,13 @@ void myFilter(const cv::Mat & src, cv::Mat & dst, int threshold1, int threshold2
     int windowSize;
     cv::Rect integralRect;
 
-    for(int r = 1; r < srcIntegral.rows; r++)
+    for(int r = 0; r < srcIntegral.rows-1; r++)
     {
-        for(int c = 1; c < srcIntegral.cols; c++)
+        for(int c = 0; c < srcIntegral.cols-1; c++)
         {
-            windowSize = ksize*dist.at<float>(r-1,c-1);
-            integralRect.x = c-windowSize-1;
-            integralRect.y = r-windowSize-1;
+            windowSize = ksize*dist.at<float>(r,c);
+            integralRect.x = c-windowSize;
+            integralRect.y = r-windowSize;
             integralRect.width = windowSize*2+1;
             integralRect.height = windowSize*2+1;
             cv::Rect matRect(0,0,srcIntegral.cols-1, srcIntegral.rows-1);
@@ -121,10 +121,10 @@ void myFilter(const cv::Mat & src, cv::Mat & dst, int threshold1, int threshold2
                     - srcIntegral.at<cv::Vec3i>(integralRect.y, integralRect.br().x);
 
             if (integralRect.area() > 0)
-                dst.at<cv::Vec3b>(r-1, c-1) = sum/integralRect.area();
+                dst.at<cv::Vec3b>(r, c) = sum/integralRect.area();
 
             else
-                dst.at<cv::Vec3b>(r-1, c-1) = src.at<cv::Vec3b>(r-1, c-1);
+                dst.at<cv::Vec3b>(r, c) = src.at<cv::Vec3b>(r, c);
 
         }
     }
