@@ -7,7 +7,7 @@ void testMyFilter(const cv::Mat & src)
     int threshold1 = 50;
     int threshold2 = 120;
     int ksize = 3;
-    cv::Mat filtered(src.rows, src.cols, CV_8UC3);
+    cv::Mat filtered;
 
     myFilter(src, filtered, threshold1, threshold2, ksize);
 

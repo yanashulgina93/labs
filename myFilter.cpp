@@ -4,58 +4,54 @@
 
 void myCanny(const cv::Mat & grayscale, cv::Mat & edges, int threshold1, int threshold2)
 {
-    edges=cv::Scalar(0);
+    edges = cv::Mat::zeros(grayscale.rows, grayscale.cols, CV_8UC1);
 
     cv::Mat gradX, gradY;
     cv::Sobel(grayscale, gradX, CV_32FC1, 1, 0);
     cv::Sobel(grayscale, gradY, CV_32FC1, 0, 1);
 
-    cv::Mat gradMagn(grayscale.rows, grayscale.cols, CV_32FC1, 0.0);
-    cv::Mat gradAngle(grayscale.rows, grayscale.cols, CV_32FC1, 0.0);
+    cv::Mat gradMagn, gradAngle;
     cv::cartToPolar(gradX, gradY, gradMagn, gradAngle, true);
 
     std::stack<cv::Point> edgePixels;
     for(int i = 1; i < gradMagn.rows-1; i++)
     {
-        float* gradMagn_prev_row_ptr = gradMagn.ptr<float>(i-1);
-        float* gradMagn_cur_row_ptr = gradMagn.ptr<float>(i);
-        float* gradMagn_next_row_ptr = gradMagn.ptr<float>(i+1);
-        float* gradAngle_cur_ptr = gradAngle.ptr<float>(i);
+        float* gradMagn_ptr = gradMagn.ptr<float>(0);
         uchar* edges_row_ptr = edges.ptr<uchar>(i);
 
-        float neighbour1Magn;
-        float neighbour2Magn;
+        int neighbour1;
+        int neighbour2;
 
         for(int j = 1; j < gradMagn.cols-1; j++)
         {
-            if (gradMagn_cur_row_ptr[j] >= threshold2)
+            float curAngle = *(gradAngle.ptr<float>(i)+j);
+            float curMagn = *(gradMagn.ptr<float>(i)+j);
+            if (curMagn >= threshold2)
             {
-                if ((gradAngle_cur_ptr[j] < 22) ||
-                        ((gradAngle_cur_ptr[j] >= 157)&&(gradAngle_cur_ptr[j] < 202)) ||
-                        (gradAngle_cur_ptr[j] >= 337))//0
+                if (curAngle >= 157)
+                    curAngle -= 180;
+                if (curAngle < 22)//0
                 {
-                    neighbour1Magn = gradMagn_prev_row_ptr[j];
-                    neighbour2Magn = gradMagn_next_row_ptr[j];
+                    neighbour1 = j - gradMagn.step;
+                    neighbour2 = j + gradMagn.step;
                 }
-                else if (((gradAngle_cur_ptr[j] >= 22)&& (gradAngle_cur_ptr[j] < 67)) ||
-                         ((gradAngle_cur_ptr[j] >= 202) && (gradAngle_cur_ptr[j] < 247)))//45
+                else if ((curAngle >= 22)&& (curAngle < 67))//45
                 {
-                    neighbour1Magn = gradMagn_prev_row_ptr[j-1];
-                    neighbour2Magn = gradMagn_next_row_ptr[j+1];
+                    neighbour1 = j - 1 - gradMagn.step;
+                    neighbour2 = j + 1 + gradMagn.step;
                 }
-                else if (((gradAngle_cur_ptr[j] >= 67) && (gradAngle_cur_ptr[j] < 112)) ||
-                         ((gradAngle_cur_ptr[j] >= 247) && (gradAngle_cur_ptr[j] < 292)))//90
+                else if ((curAngle >= 67) && (curAngle < 112))//90
                 {
-                    neighbour1Magn = gradMagn_cur_row_ptr[j-1];
-                    neighbour2Magn = gradMagn_cur_row_ptr[j+1];
+                    neighbour1 = j - 1;
+                    neighbour2 = j + 1;
                 }
                 else //135
                 {
-                    neighbour1Magn = gradMagn_next_row_ptr[j-1];
-                    neighbour2Magn = gradMagn_prev_row_ptr[j+1];
+                    neighbour1 = j - 1 + gradMagn.step;
+                    neighbour2 = j + 1 - gradMagn.step;
                 }
 
-                if ((gradMagn_cur_row_ptr[j] > neighbour1Magn) && (gradMagn_cur_row_ptr[j] > neighbour2Magn))
+                if ((curMagn > gradMagn_ptr[neighbour1]) && (curMagn > gradMagn_ptr[neighbour2]))
                 {
                     edges_row_ptr[j] = 255;
                     edgePixels.push(cv::Point(j,i));
@@ -88,16 +84,17 @@ void myCanny(const cv::Mat & grayscale, cv::Mat & edges, int threshold1, int thr
 
 void myFilter(const cv::Mat & src, cv::Mat & dst, int threshold1, int threshold2, int ksize)
 {
+    dst.create(src.rows, src.cols, CV_8UC3);
     cv::Mat grayscale;
     cv::cvtColor(src, grayscale, CV_BGR2GRAY);
-    cv::Mat edges(src.rows, src.cols, CV_8UC1);
+    cv::Mat edges;
     myCanny(grayscale, edges, threshold1, threshold2);
 
     cv::Mat dist, inv;
     cv::bitwise_not(edges, inv);
     cv::distanceTransform(inv, dist, CV_DIST_C, 3);
 
-    cv::Mat srcIntegral(src.rows, src.cols, CV_32SC3);
+    cv::Mat srcIntegral;
     cv::integral(src, srcIntegral, CV_32S);
     int windowSize;
     cv::Rect integralRect;
@@ -115,8 +112,8 @@ void myFilter(const cv::Mat & src, cv::Mat & dst, int threshold1, int threshold2
             integralRect = integralRect & matRect;
 
             cv::Vec3i sum =
-                    srcIntegral.at<cv::Vec3i>(integralRect.br().y, integralRect.br().x)
-                    + srcIntegral.at<cv::Vec3i>(integralRect.y, integralRect.x)
+                    srcIntegral.at<cv::Vec3i>(integralRect.br())
+                    + srcIntegral.at<cv::Vec3i>(integralRect.tl())
                     - srcIntegral.at<cv::Vec3i>(integralRect.br().y, integralRect.x)
                     - srcIntegral.at<cv::Vec3i>(integralRect.y, integralRect.br().x);
 
