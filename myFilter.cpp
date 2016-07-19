@@ -16,7 +16,7 @@ void myCanny(const cv::Mat & grayscale, cv::Mat & edges, int threshold1, int thr
     std::stack<cv::Point> edgePixels;
     for(int i = 1; i < gradMagn.rows-1; i++)
     {
-        float* gradMagn_ptr = gradMagn.ptr<float>(0);
+        float* gradMagn_ptr = gradMagn.ptr<float>(i);
         uchar* edges_row_ptr = edges.ptr<uchar>(i);
 
         int neighbour1;
