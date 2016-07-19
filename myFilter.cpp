@@ -18,14 +18,15 @@ void myCanny(const cv::Mat & grayscale, cv::Mat & edges, int threshold1, int thr
     {
         float* gradMagn_ptr = gradMagn.ptr<float>(i);
         uchar* edges_row_ptr = edges.ptr<uchar>(i);
+        float* gradAngle_ptr = gradAngle.ptr<float>(i);
 
         int neighbour1;
         int neighbour2;
 
         for(int j = 1; j < gradMagn.cols-1; j++)
         {
-            float curAngle = *(gradAngle.ptr<float>(i)+j);
-            float curMagn = *(gradMagn.ptr<float>(i)+j);
+            float curAngle = *(gradAngle_ptr+j);
+            float curMagn = *(gradMagn_ptr+j);
             if (curMagn >= threshold2)
             {
                 if (curAngle >= 157)
